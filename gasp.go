@@ -29,7 +29,11 @@ func lex(src string) []string {
 	numbers := `\d+`
 	operators := `\+|\-|\*|/`
 	identifiers := `(\w|\-)+`
-	re := regexp.MustCompile(parens + "|" + numbers + "|" + operators + "|" + identifiers)
+	re := regexp.MustCompile(
+		parens +
+			"|" + numbers +
+			"|" + operators +
+			"|" + identifiers)
 	matches := re.FindAllString(src, -1)
 	return matches
 }
