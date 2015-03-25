@@ -1,30 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"container/list"
 	"regexp"
 )
 
-var src = `(define (union-set s1 s2)
-  (cond ((and (null? s1) (null? s2)) '())
-        ((null? s1) s2)
-        ((null? s2) s1)
-        (else
-          (let (
-                (e1 (car s1))
-                (e2 (car s2))
-                (rest (union-set (cdr s1) (cdr s2))))
-            (cond ((< e1 e2) (cons e1 (cons e2 rest)))
-                  ((= e1 e2) (cons e1 rest))
-                  ((> e1 e2) (cons e2 (cons e1 rest))))))))`
-
-var src2 = `(+ (* 1 2 ) (/ 2 chicken) (- he-llo the_re))`
-
 func main() {
-	fmt.Printf("%q\n", lex(src2))
 }
 
-func lex(src string) []string {
+func Lex(src string) []string {
 	parens := `[(]|[)]`
 	numbers := `\d+`
 	operators := `\+|\-|\*|/`
@@ -36,4 +20,34 @@ func lex(src string) []string {
 			"|" + identifiers)
 	matches := re.FindAllString(src, -1)
 	return matches
+}
+
+func Parse(tokens []string) *list.List {
+	stack := list.New()
+	push(stack, list.New())
+	for _, token := range tokens {
+		if token == "(" {
+			push(stack, list.New())
+		} else if token == ")" {
+			childExpr := pop(stack).(*list.List)
+			parentExpr := pop(stack).(*list.List)
+			parentExpr.PushBack(childExpr)
+			push(stack, parentExpr)
+		} else {
+			expr := pop(stack).(*list.List)
+			expr.PushBack(token)
+			push(stack, expr)
+		}
+	}
+	exprs := pop(stack).(*list.List)
+	expr := exprs.Front().Value.(*list.List)
+	return expr
+}
+
+func push(l *list.List, v interface{}) {
+	l.PushFront(v)
+}
+
+func pop(l *list.List) interface{} {
+	return l.Remove(l.Front())
 }
