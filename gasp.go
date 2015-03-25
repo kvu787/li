@@ -18,17 +18,17 @@ var src = `(define (union-set s1 s2)
                   ((= e1 e2) (cons e1 rest))
                   ((> e1 e2) (cons e2 (cons e1 rest))))))))`
 
-var src2 = `(+ (* 1 2 ) (/ 2 chicken))`
+var src2 = `(+ (* 1 2 ) (/ 2 chicken) (- he-llo the_re))`
 
 func main() {
-	fmt.Printf("%q\n", tokenize(src2))
+	fmt.Printf("%q\n", lex(src2))
 }
 
-func tokenize(src string) []string {
+func lex(src string) []string {
 	parens := `[(]|[)]`
 	numbers := `\d+`
 	operators := `\+|\-|\*|/`
-	identifiers := `\w+`
+	identifiers := `(\w|\-)+`
 	re := regexp.MustCompile(parens + "|" + numbers + "|" + operators + "|" + identifiers)
 	matches := re.FindAllString(src, -1)
 	return matches
