@@ -3,6 +3,7 @@ package main
 import (
 	"container/list"
 	"regexp"
+	"strconv"
 )
 
 func main() {
@@ -42,6 +43,44 @@ func Parse(tokens []string) *list.List {
 	exprs := pop(stack).(*list.List)
 	expr := exprs.Front().Value.(*list.List)
 	return expr
+}
+
+func Eval(expr interface{}) interface{} {
+	switch expr.(type) {
+	case *list.List:
+		l := expr.(*list.List)
+		switch l.Len() {
+		case 0:
+			// empty expression
+			panic("empty expression")
+		case 1:
+			// cannot be a function, so eval only element
+			panic("function application with no arguments")
+		default:
+			// must be a function
+			operator := l.Front().Value.(string)
+			a := Eval(l.Front().Next().Value).(int)
+			b := Eval(l.Front().Next().Next().Value).(int)
+			switch operator {
+			case "+":
+				return a + b
+			case "-":
+				return a - b
+			case "*":
+				return a * b
+			case "/":
+				return a / b
+			default:
+				panic("unrecognized operator")
+			}
+		}
+	case string:
+		s := expr.(string)
+		i, _ := strconv.Atoi(s)
+		return i
+	default:
+		panic("unrecognized expression")
+	}
 }
 
 func push(l *list.List, v interface{}) {
