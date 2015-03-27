@@ -23,7 +23,7 @@ func Lex(src string) []string {
 	return matches
 }
 
-func Parse(tokens []string) *list.List {
+func Parse(tokens []string) interface{} {
 	stack := list.New()
 	push(stack, list.New())
 	for _, token := range tokens {
@@ -41,7 +41,7 @@ func Parse(tokens []string) *list.List {
 		}
 	}
 	exprs := pop(stack).(*list.List)
-	expr := exprs.Front().Value.(*list.List)
+	expr := exprs.Front().Value
 	return expr
 }
 
