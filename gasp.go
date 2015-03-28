@@ -23,7 +23,7 @@ func Lex(src string) []string {
 	return matches
 }
 
-func Parse(tokens []string) interface{} {
+func Parse(tokens []string) *list.List {
 	stack := list.New()
 	push(stack, list.New())
 	for _, token := range tokens {
@@ -40,48 +40,97 @@ func Parse(tokens []string) interface{} {
 			push(stack, expr)
 		}
 	}
-	exprs := pop(stack).(*list.List)
-	expr := exprs.Front().Value
-	return expr
+	return pop(stack).(*list.List)
 }
 
-func Eval(expr interface{}) interface{} {
+func Eval(expr interface{}, env map[string]interface{}) interface{} {
 	switch expr.(type) {
 	case *list.List:
+		// must be a function application
 		l := expr.(*list.List)
-		switch l.Len() {
-		case 0:
-			// empty expression
-			panic("empty expression")
-		case 1:
-			// cannot be a function, so eval only element
-			panic("function application with no arguments")
+		function := l.Front().Value.(string)
+		switch function {
+		case "define":
+			// modify the current environment
+			name := l.Front().Next().Value.(string)
+			value := l.Front().Next().Next().Value
+			env[name] = Eval(value, env)
+			return nil
+		case "lambda":
+			params := l.Front().Next().Value.(*list.List)
+			body := l.Front().Next().Next().Value.(*list.List)
+			return Proc(func(args *list.List, env map[string]interface{}) interface{} {
+				// set arguments and evaluate
+				procEnv := copyEnv(env)
+				e1 := params.Front()
+				e2 := args.Front()
+				for e1 != nil {
+					procEnv[e1.Value.(string)] = e2.Value
+					e1 = e1.Next()
+					e2 = e2.Next()
+				}
+				return Eval(body, procEnv)
+			})
+		case "if":
+			panic("if unimplemented")
 		default:
-			// must be a function
-			operator := l.Front().Value.(string)
-			a := Eval(l.Front().Next().Value).(int)
-			b := Eval(l.Front().Next().Next().Value).(int)
-			switch operator {
-			case "+":
-				return a + b
-			case "-":
-				return a - b
-			case "*":
-				return a * b
-			case "/":
-				return a / b
-			default:
-				panic("unrecognized operator")
+			proc := Eval(function, env).(Proc)
+			args := list.New()
+			for e := l.Front().Next(); e != nil; e = e.Next() {
+				args.PushBack(Eval(e.Value, env))
 			}
+			return proc(args, env)
 		}
 	case string:
+		// must be either literal or a binding
 		s := expr.(string)
-		i, _ := strconv.Atoi(s)
-		return i
-	default:
-		panic("unrecognized expression")
+		i, err := strconv.Atoi(s)
+		if err == nil {
+			return i
+		} else {
+			return env[s]
+		}
 	}
+	panic("bad")
 }
+
+func Exec(src string) interface{} {
+	env := map[string]interface{}{
+		"+": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			res := 0
+			for e := args.Front(); e != nil; e = e.Next() {
+				res += e.Value.(int)
+			}
+			return res
+		}),
+		"*": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			res := 1
+			for e := args.Front(); e != nil; e = e.Next() {
+				res *= e.Value.(int)
+			}
+			return res
+		}),
+		"-": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.(int)
+			b := args.Front().Next().Value.(int)
+			return a - b
+		}),
+		"/": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.(int)
+			b := args.Front().Next().Value.(int)
+			return a / b
+		}),
+	}
+	tokens := Lex(src)
+	exprs := Parse(tokens)
+	var retval interface{}
+	for e := exprs.Front(); e != nil; e = e.Next() {
+		retval = Eval(e.Value, env)
+	}
+	return retval
+}
+
+type Proc func(args *list.List, env map[string]interface{}) interface{}
 
 func push(l *list.List, v interface{}) {
 	l.PushFront(v)
@@ -89,4 +138,12 @@ func push(l *list.List, v interface{}) {
 
 func pop(l *list.List) interface{} {
 	return l.Remove(l.Front())
+}
+
+func copyEnv(src map[string]interface{}) map[string]interface{} {
+	copy := make(map[string]interface{})
+	for k := range src {
+		copy[k] = src[k]
+	}
+	return copy
 }
