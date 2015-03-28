@@ -74,7 +74,14 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 				return Eval(body, procEnv)
 			})
 		case "if":
-			panic("if unimplemented")
+			conditionExpr := l.Front().Next().Value
+			conseqExpr := l.Front().Next().Next().Value
+			altExpr := l.Front().Next().Next().Next().Value
+			if Eval(conditionExpr, env).(bool) {
+				return Eval(conseqExpr, env)
+			} else {
+				return Eval(altExpr, env)
+			}
 		default:
 			proc := Eval(function, env).(Proc)
 			args := list.New()
