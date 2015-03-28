@@ -10,12 +10,14 @@ func main() {
 }
 
 func Lex(src string) []string {
+	bools := `(#t)|(#f)`
 	parens := `[(]|[)]`
 	numbers := `\d+`
-	operators := `\+|\-|\*|/`
+	operators := `\+|\-|\*|/|<|>|(<=)|(>=)`
 	identifiers := `(\w|\-)+`
 	re := regexp.MustCompile(
-		parens +
+		bools +
+			"|" + parens +
 			"|" + numbers +
 			"|" + operators +
 			"|" + identifiers)
@@ -84,8 +86,11 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 	case string:
 		// must be either literal or a binding
 		s := expr.(string)
-		i, err := strconv.Atoi(s)
-		if err == nil {
+		if s == "#t" {
+			return true
+		} else if s == "#f" {
+			return false
+		} else if i, err := strconv.Atoi(s); err == nil {
 			return i
 		} else {
 			return env[s]
@@ -95,32 +100,7 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 }
 
 func Exec(src string) interface{} {
-	env := map[string]interface{}{
-		"+": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			res := 0
-			for e := args.Front(); e != nil; e = e.Next() {
-				res += e.Value.(int)
-			}
-			return res
-		}),
-		"*": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			res := 1
-			for e := args.Front(); e != nil; e = e.Next() {
-				res *= e.Value.(int)
-			}
-			return res
-		}),
-		"-": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.(int)
-			b := args.Front().Next().Value.(int)
-			return a - b
-		}),
-		"/": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.(int)
-			b := args.Front().Next().Value.(int)
-			return a / b
-		}),
-	}
+	env := CreateDefaultEnv()
 	tokens := Lex(src)
 	exprs := Parse(tokens)
 	var retval interface{}
@@ -146,4 +126,37 @@ func copyEnv(src map[string]interface{}) map[string]interface{} {
 		copy[k] = src[k]
 	}
 	return copy
+}
+
+func CreateDefaultEnv() map[string]interface{} {
+	createIntBinaryProc := func(bf func(a, b int) interface{}) Proc {
+		return Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.(int)
+			b := args.Front().Next().Value.(int)
+			return bf(a, b)
+		})
+	}
+
+	return map[string]interface{}{
+		"+": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			res := 0
+			for e := args.Front(); e != nil; e = e.Next() {
+				res += e.Value.(int)
+			}
+			return res
+		}),
+		"*": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			res := 1
+			for e := args.Front(); e != nil; e = e.Next() {
+				res *= e.Value.(int)
+			}
+			return res
+		}),
+		"-":  createIntBinaryProc(func(a, b int) interface{} { return a - b }),
+		"/":  createIntBinaryProc(func(a, b int) interface{} { return a / b }),
+		">":  createIntBinaryProc(func(a, b int) interface{} { return a > b }),
+		">=": createIntBinaryProc(func(a, b int) interface{} { return a >= b }),
+		"<":  createIntBinaryProc(func(a, b int) interface{} { return a < b }),
+		"<=": createIntBinaryProc(func(a, b int) interface{} { return a <= b }),
+	}
 }
