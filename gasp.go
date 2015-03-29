@@ -89,6 +89,17 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 				retval = Eval(e.Value, beginEnv)
 			}
 			return retval
+		case "let":
+			letEnv := copyEnv(env)
+			defList := l.Front().Next().Value.(*list.List)
+			for e := defList.Front(); e != nil; e = e.Next() {
+				pair := e.Value.(*list.List)
+				name := pair.Front().Value.(string)
+				value := pair.Front().Next().Value
+				letEnv[name] = Eval(value, env)
+			}
+			expr := l.Front().Next().Next().Value
+			return Eval(expr, letEnv)
 		default:
 			proc := Eval(function, env).(Proc)
 			args := list.New()
