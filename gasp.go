@@ -82,6 +82,13 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			} else {
 				return Eval(altExpr, env)
 			}
+		case "begin":
+			beginEnv := copyEnv(env)
+			var retval interface{} = nil
+			for e := l.Front().Next(); e != nil; e = e.Next() {
+				retval = Eval(e.Value, beginEnv)
+			}
+			return retval
 		default:
 			proc := Eval(function, env).(Proc)
 			args := list.New()
