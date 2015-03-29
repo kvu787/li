@@ -145,6 +145,26 @@ func CreateDefaultEnv() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
+		"cons": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value
+			b := args.Front().Next().Value
+			return [2]interface{}{a, b}
+		}),
+		"car": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.([2]interface{})
+			return a[0]
+		}),
+		"cdr": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.([2]interface{})
+			return a[1]
+		}),
+		"list": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			result := [2]interface{}{nil, nil}
+			for e := args.Back(); e != nil; e = e.Prev() {
+				result = [2]interface{}{e.Value, result}
+			}
+			return result
+		}),
 		"+": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
 			res := 0
 			for e := args.Front(); e != nil; e = e.Next() {
