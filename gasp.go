@@ -13,7 +13,7 @@ func Lex(src string) []string {
 	bools := `(#t)|(#f)`
 	parens := `[(]|[)]`
 	numbers := `\d+`
-	operators := `\+|\-|\*|/|<|>|(<=)|(>=)`
+	operators := `\+|\-|\*|/|<|>|(<=)|(>=)|=`
 	identifiers := `(\w|\-|\?)+`
 	re := regexp.MustCompile(
 		bools +
@@ -207,5 +207,19 @@ func CreateDefaultEnv() map[string]interface{} {
 		">=": createIntBinaryProc(func(a, b int) interface{} { return a >= b }),
 		"<":  createIntBinaryProc(func(a, b int) interface{} { return a < b }),
 		"<=": createIntBinaryProc(func(a, b int) interface{} { return a <= b }),
+		"=":  createIntBinaryProc(func(a, b int) interface{} { return a == b }),
+		"not": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			return !(args.Front().Value.(bool))
+		}),
+		"and": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.(bool)
+			b := args.Front().Next().Value.(bool)
+			return a && b
+		}),
+		"or": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.(bool)
+			b := args.Front().Next().Value.(bool)
+			return a || b
+		}),
 	}
 }
