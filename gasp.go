@@ -225,13 +225,14 @@ func CreateDefaultEnv() map[string]interface{} {
 			}
 			return res
 		}),
-		"-":  createIntBinaryProc(func(a, b int) interface{} { return a - b }),
-		"/":  createIntBinaryProc(func(a, b int) interface{} { return a / b }),
-		">":  createIntBinaryProc(func(a, b int) interface{} { return a > b }),
-		">=": createIntBinaryProc(func(a, b int) interface{} { return a >= b }),
-		"<":  createIntBinaryProc(func(a, b int) interface{} { return a < b }),
-		"<=": createIntBinaryProc(func(a, b int) interface{} { return a <= b }),
-		"=":  createIntBinaryProc(func(a, b int) interface{} { return a == b }),
+		"-":         createIntBinaryProc(func(a, b int) interface{} { return a - b }),
+		"/":         createIntBinaryProc(func(a, b int) interface{} { return a / b }),
+		">":         createIntBinaryProc(func(a, b int) interface{} { return a > b }),
+		">=":        createIntBinaryProc(func(a, b int) interface{} { return a >= b }),
+		"<":         createIntBinaryProc(func(a, b int) interface{} { return a < b }),
+		"<=":        createIntBinaryProc(func(a, b int) interface{} { return a <= b }),
+		"=":         createIntBinaryProc(func(a, b int) interface{} { return a == b }),
+		"remainder": createIntBinaryProc(func(a, b int) interface{} { return a % b }),
 		"not": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
 			return !(args.Front().Value.(bool))
 		}),
