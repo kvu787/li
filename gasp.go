@@ -82,6 +82,30 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			} else {
 				return Eval(altExpr, env)
 			}
+		case "cond":
+			var e *list.Element
+			for e = l.Front().Next(); e.Next() != nil; e = e.Next() {
+				branch := e.Value.(*list.List)
+				conditionExpr := branch.Front().Value
+				branchEnv := copyEnv(env)
+				if Eval(conditionExpr, branchEnv).(bool) {
+					exprEnv := copyEnv(env)
+					return Eval(branch.Front().Next().Value, exprEnv)
+				}
+			}
+			branch := e.Value.(*list.List)
+			if scond, ok := branch.Front().Value.(string); ok && (scond == "else") {
+				exprEnv := copyEnv(env)
+				return Eval(branch.Front().Next().Value, exprEnv)
+			} else {
+				conditionExpr := branch.Front().Value
+				branchEnv := copyEnv(env)
+				if Eval(conditionExpr, branchEnv).(bool) {
+					exprEnv := copyEnv(env)
+					return Eval(branch.Front().Next().Value, exprEnv)
+				}
+			}
+			return [2]interface{}{nil, nil}
 		case "begin":
 			beginEnv := copyEnv(env)
 			var retval interface{} = nil
