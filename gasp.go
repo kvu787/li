@@ -14,7 +14,7 @@ func Lex(src string) []string {
 	parens := `[(]|[)]`
 	numbers := `\d+`
 	operators := `\+|\-|\*|/|<|>|(<=)|(>=)`
-	identifiers := `(\w|\-)+`
+	identifiers := `(\w|\-|\?)+`
 	re := regexp.MustCompile(
 		bools +
 			"|" + parens +
@@ -175,6 +175,10 @@ func CreateDefaultEnv() map[string]interface{} {
 		"cdr": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
 			a := args.Front().Value.([2]interface{})
 			return a[1]
+		}),
+		"null?": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value.([2]interface{})
+			return (a[0] == nil) && (a[1] == nil)
 		}),
 		"list": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
 			result := [2]interface{}{nil, nil}
