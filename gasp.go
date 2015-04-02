@@ -15,12 +15,14 @@ func Lex(src string) []string {
 	numbers := `\d+`
 	operators := `\+|\-|\*|/|<|>|(<=)|(>=)|=`
 	identifiers := `(\w|\-|\?)+`
+	comments := ";.*"
 	re := regexp.MustCompile(
 		bools +
 			"|" + parens +
 			"|" + numbers +
 			"|" + operators +
-			"|" + identifiers)
+			"|" + identifiers +
+			"|" + comments)
 	matches := re.FindAllString(src, -1)
 	return matches
 }
@@ -36,6 +38,8 @@ func Parse(tokens []string) *list.List {
 			parentExpr := pop(stack).(*list.List)
 			parentExpr.PushBack(childExpr)
 			push(stack, parentExpr)
+		} else if token[0] == ';' { // ignore comments
+			continue
 		} else {
 			expr := pop(stack).(*list.List)
 			expr.PushBack(token)
