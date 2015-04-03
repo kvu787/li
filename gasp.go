@@ -2,8 +2,10 @@ package main
 
 import (
 	"container/list"
+	"math/rand"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -181,6 +183,8 @@ func copyEnv(src map[string]interface{}) map[string]interface{} {
 	return copy
 }
 
+var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+
 func CreateDefaultEnv() map[string]interface{} {
 	createIntBinaryProc := func(bf func(a, b int) interface{}) Proc {
 		return Proc(func(args *list.List, _ map[string]interface{}) interface{} {
@@ -191,6 +195,11 @@ func CreateDefaultEnv() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
+		// return random integer in [0, n)
+		"random": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
+			a := args.Front().Value
+			return rng.Intn(a.(int))
+		}),
 		"cons": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
 			a := args.Front().Value
 			b := args.Front().Next().Value
