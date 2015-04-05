@@ -2,13 +2,17 @@ package main
 
 import (
 	"container/list"
+	"fmt"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"time"
 )
 
+var specialForms map[string]Proc
+
 func main() {
+
 }
 
 func Lex(src string) []string {
@@ -51,22 +55,17 @@ func Parse(tokens []string) *list.List {
 	return pop(stack).(*list.List)
 }
 
-func Eval(expr interface{}, env map[string]interface{}) interface{} {
-	switch expr.(type) {
-	case *list.List:
-		// must be a function application
-		l := expr.(*list.List)
-		function := l.Front().Value.(string)
-		switch function {
-		case "define":
-			// modify the current environment
-			name := l.Front().Next().Value.(string)
-			value := l.Front().Next().Next().Value
+func init() {
+	specialForms = map[string]Proc{
+		"define": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
+			name := expr.Front().Next().Value.(string)
+			value := expr.Front().Next().Next().Value
 			env[name] = Eval(value, env)
 			return nil
-		case "lambda":
-			params := l.Front().Next().Value.(*list.List)
-			body := l.Front().Next().Next().Value.(*list.List)
+		}),
+		"lambda": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
+			params := expr.Front().Next().Value.(*list.List)
+			body := expr.Front().Next().Next().Value
 			return Proc(func(args *list.List, env map[string]interface{}) interface{} {
 				// set arguments and evaluate
 				procEnv := copyEnv(env)
@@ -79,76 +78,109 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 				}
 				return Eval(body, procEnv)
 			})
-		case "if":
-			conditionExpr := l.Front().Next().Value
-			conseqExpr := l.Front().Next().Next().Value
-			altExpr := l.Front().Next().Next().Next().Value
-			if Eval(conditionExpr, env).(bool) {
-				return Eval(conseqExpr, env)
+		}),
+		"if": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
+			condition := expr.Front().Next().Value
+			conseq := expr.Front().Next().Next().Value
+			alt := expr.Front().Next().Next().Next().Value
+			if Eval(condition, env).(bool) {
+				return Eval(conseq, env)
 			} else {
-				return Eval(altExpr, env)
+				return Eval(alt, env)
 			}
-		case "cond":
+		}),
+		"cond": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
 			var e *list.Element
-			for e = l.Front().Next(); e.Next() != nil; e = e.Next() {
+
+			// check n - 1 branches
+			for e = expr.Front().Next(); e.Next() != nil; e = e.Next() {
 				branch := e.Value.(*list.List)
 				conditionExpr := branch.Front().Value
-				branchEnv := copyEnv(env)
-				if Eval(conditionExpr, branchEnv).(bool) {
-					exprEnv := copyEnv(env)
-					return Eval(branch.Front().Next().Value, exprEnv)
+				if Eval(conditionExpr, env).(bool) {
+					return Eval(branch.Front().Next().Value, env)
 				}
 			}
+
+			// check last branch for 'else'
 			branch := e.Value.(*list.List)
 			if scond, ok := branch.Front().Value.(string); ok && (scond == "else") {
-				exprEnv := copyEnv(env)
-				return Eval(branch.Front().Next().Value, exprEnv)
+				return Eval(branch.Front().Next().Value, env)
 			} else {
 				conditionExpr := branch.Front().Value
-				branchEnv := copyEnv(env)
-				if Eval(conditionExpr, branchEnv).(bool) {
-					exprEnv := copyEnv(env)
-					return Eval(branch.Front().Next().Value, exprEnv)
+				if Eval(conditionExpr, env).(bool) {
+					return Eval(branch.Front().Next().Value, env)
 				}
 			}
-			return [2]interface{}{nil, nil}
-		case "begin":
+			panic("no branch matched in 'cond' expression")
+		}),
+		"begin": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
 			beginEnv := copyEnv(env)
 			var retval interface{} = nil
-			for e := l.Front().Next(); e != nil; e = e.Next() {
+			for e := expr.Front().Next(); e != nil; e = e.Next() {
 				retval = Eval(e.Value, beginEnv)
 			}
 			return retval
-		case "let":
+		}),
+		"let": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
 			letEnv := copyEnv(env)
-			defList := l.Front().Next().Value.(*list.List)
+			defList := expr.Front().Next().Value.(*list.List)
 			for e := defList.Front(); e != nil; e = e.Next() {
 				pair := e.Value.(*list.List)
 				name := pair.Front().Value.(string)
 				value := pair.Front().Next().Value
 				letEnv[name] = Eval(value, env)
 			}
-			expr := l.Front().Next().Next().Value
-			return Eval(expr, letEnv)
-		default:
+			return Eval(expr.Front().Next().Next().Value, letEnv)
+		}),
+	}
+}
+
+func Eval(expr interface{}, env map[string]interface{}) interface{} {
+	switch expr.(type) {
+	case *list.List:
+		l := expr.(*list.List)
+		if l.Len() > 1 {
+			// must be a function application
+			function := l.Front().Value.(string)
+			if sf, ok := specialForms[function]; ok {
+				return sf(l, env)
+			}
 			proc := Eval(function, env).(Proc)
 			args := list.New()
 			for e := l.Front().Next(); e != nil; e = e.Next() {
 				args.PushBack(Eval(e.Value, env))
 			}
 			return proc(args, env)
+		} else {
+			// might be a function application
+			name := l.Front().Value.(string)
+			if val, ok := Eval(name, env).(Proc); ok {
+				// apply if proc
+				return val(list.New(), env)
+			} else {
+				// return val if not proc
+				return val
+			}
 		}
 	case string:
 		// must be either literal or a binding
 		s := expr.(string)
 		if s == "#t" {
+			// true literal
 			return true
 		} else if s == "#f" {
+			// false literal
 			return false
 		} else if i, err := strconv.Atoi(s); err == nil {
+			// integer literal
 			return i
 		} else {
-			return env[s]
+			// identifier
+			val, ok := env[s]
+			if !ok {
+				panic(fmt.Sprintf("identifier not found: %s", s))
+			}
+			return val
 		}
 	}
 	panic("bad")
