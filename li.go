@@ -143,14 +143,20 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			// must be a function application
 			function := l.Front().Value.(string)
 			if sf, ok := specialForms[function]; ok {
+				// check if special form
 				return sf(l, env)
+			} else {
+				// eval as regular procedure
+				proc, ok := Eval(function, env).(Proc)
+				if !ok {
+					panic(fmt.Sprintf(`eval: expected procedure, received token %s`, function))
+				}
+				args := list.New()
+				for e := l.Front().Next(); e != nil; e = e.Next() {
+					args.PushBack(Eval(e.Value, env))
+				}
+				return proc(args, env)
 			}
-			proc := Eval(function, env).(Proc)
-			args := list.New()
-			for e := l.Front().Next(); e != nil; e = e.Next() {
-				args.PushBack(Eval(e.Value, env))
-			}
-			return proc(args, env)
 		} else {
 			// might be a function application
 			name := l.Front().Value.(string)
@@ -178,12 +184,17 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			// identifier
 			val, ok := env[s]
 			if !ok {
-				panic(fmt.Sprintf("identifier not found: %s", s))
+				panic(fmt.Sprintf("eval: identifier not found: %s", s))
+			} else {
+				return val
 			}
-			return val
 		}
+	default:
+		panic(fmt.Sprintf(`eval: received invalid expression
+	type: %T
+	value: %v`,
+			expr, expr))
 	}
-	panic("bad")
 }
 
 func Exec(src string) interface{} {
