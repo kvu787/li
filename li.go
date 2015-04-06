@@ -64,7 +64,7 @@ func Lex(src string) ([]string, error) {
 	return tokens, nil
 }
 
-func Parse(tokens []string) *list.List {
+func Parse(tokens []string) (*list.List, error) {
 	stack := list.New()
 	push(stack, list.New())
 	for _, token := range tokens {
@@ -72,6 +72,9 @@ func Parse(tokens []string) *list.List {
 			push(stack, list.New())
 		} else if token == ")" {
 			childExpr := pop(stack).(*list.List)
+			if stack.Len() == 0 {
+				return nil, fmt.Errorf("Parse: overcomplete expression")
+			}
 			parentExpr := pop(stack).(*list.List)
 			parentExpr.PushBack(childExpr)
 			push(stack, parentExpr)
@@ -83,7 +86,10 @@ func Parse(tokens []string) *list.List {
 			push(stack, expr)
 		}
 	}
-	return pop(stack).(*list.List)
+	if stack.Len() > 1 {
+		return nil, fmt.Errorf("Parse: incomplete expression")
+	}
+	return pop(stack).(*list.List), nil
 }
 
 func init() {
@@ -230,11 +236,18 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 
 func Exec(src string) (interface{}, error) {
 	env := CreateDefaultEnv()
+
+	var err error
 	tokens, err := Lex(src)
 	if err != nil {
 		return nil, err
 	}
-	exprs := Parse(tokens)
+
+	exprs, err := Parse(tokens)
+	if err != nil {
+		return nil, err
+	}
+
 	var retval interface{}
 	for e := exprs.Front(); e != nil; e = e.Next() {
 		retval = Eval(e.Value, env)
