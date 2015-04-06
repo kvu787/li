@@ -180,10 +180,10 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			// must be a function application
 			function := l.Front().Value.(string)
 			if sf, ok := specialForms[function]; ok {
-				// check if special form
+				// eval special form
 				return sf(l, env)
 			} else {
-				// eval as regular procedure
+				// lookup and eval as regular procedure
 				proc, ok := Eval(function, env).(Proc)
 				if !ok {
 					panic(fmt.Sprintf(`Eval: expected procedure, received token %s`, function))
