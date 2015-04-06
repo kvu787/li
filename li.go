@@ -15,22 +15,53 @@ func main() {
 
 }
 
-func Lex(src string) []string {
-	bools := `(#t)|(#f)`
-	parens := `[(]|[)]`
-	numbers := `\d+`
-	operators := `\+|\-|\*|/|<|>|(<=)|(>=)|=`
-	identifiers := `(\w|\-|\?)+`
-	comments := ";.*"
-	re := regexp.MustCompile(
-		bools +
-			"|" + parens +
-			"|" + numbers +
-			"|" + operators +
-			"|" + identifiers +
-			"|" + comments)
-	matches := re.FindAllString(src, -1)
-	return matches
+func Lex(src string) ([]string, error) {
+	// declare regexp strings
+	reStrings := []string{
+		`(#t)|(#f)`,                  // boolean literals
+		`[(]|[)]`,                    // parens
+		`[123456789]\d*`,             // integer literals
+		`\+|\-|\*|/|<|>|(<=)|(>=)|=`, // operators
+		`(\w|\-|\?)+`,                // identifiers
+		`;.*`,                        // single-line comments
+		`((?s)[[:space:]]+)`,         // whitespace
+	}
+
+	// compile strings to regexp objects
+	regexes := make([]*regexp.Regexp, len(reStrings))
+	for i, v := range reStrings {
+		regexes[i] = regexp.MustCompile(v)
+	}
+
+	// let i be the current index of input
+	// advance and tokenize input until end of input or error
+	tokens := []string{}
+	for i := 0; i < len(src); {
+
+		// check if any regex matches input
+		reMatched := false
+		for j, re := range regexes {
+			loc := re.FindStringIndex(src[i:])
+			if loc != nil && loc[0] == 0 {
+
+				// skip whitespace regex
+				if j != len(reStrings)-1 {
+					tokens = append(tokens, src[i:][loc[0]:loc[1]])
+				}
+
+				reMatched = true
+				i += (loc[1] - loc[0])
+				break
+			}
+		}
+
+		// error if no regex can match current input
+		if !reMatched {
+			return nil, fmt.Errorf("Lex: unrecognized token: %q", src[i:])
+		}
+	}
+
+	return tokens, nil
 }
 
 func Parse(tokens []string) *list.List {
@@ -111,7 +142,7 @@ func init() {
 					return Eval(branch.Front().Next().Value, env)
 				}
 			}
-			panic("no branch matched in 'cond' expression")
+			panic("Eval: no branch matched in 'cond' expression")
 		}),
 		"begin": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
 			beginEnv := copyEnv(env)
@@ -149,7 +180,7 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 				// eval as regular procedure
 				proc, ok := Eval(function, env).(Proc)
 				if !ok {
-					panic(fmt.Sprintf(`eval: expected procedure, received token %s`, function))
+					panic(fmt.Sprintf(`Eval: expected procedure, received token %s`, function))
 				}
 				args := list.New()
 				for e := l.Front().Next(); e != nil; e = e.Next() {
@@ -184,28 +215,31 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			// identifier
 			val, ok := env[s]
 			if !ok {
-				panic(fmt.Sprintf("eval: identifier not found: %s", s))
+				panic(fmt.Sprintf("Eval: identifier not found: %s", s))
 			} else {
 				return val
 			}
 		}
 	default:
-		panic(fmt.Sprintf(`eval: received invalid expression
+		panic(fmt.Sprintf(`Eval: received invalid expression
 	type: %T
 	value: %v`,
 			expr, expr))
 	}
 }
 
-func Exec(src string) interface{} {
+func Exec(src string) (interface{}, error) {
 	env := CreateDefaultEnv()
-	tokens := Lex(src)
+	tokens, err := Lex(src)
+	if err != nil {
+		return nil, err
+	}
 	exprs := Parse(tokens)
 	var retval interface{}
 	for e := exprs.Front(); e != nil; e = e.Next() {
 		retval = Eval(e.Value, env)
 	}
-	return retval
+	return retval, nil
 }
 
 type Proc func(args *list.List, env map[string]interface{}) interface{}
