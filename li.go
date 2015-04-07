@@ -1,15 +1,13 @@
 package main
 
 import (
-	"container/list"
 	"fmt"
+	"li/stack"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"time"
 )
-
-var specialForms map[string]Proc
 
 func main() {
 
@@ -64,146 +62,61 @@ func Lex(src string) ([]string, error) {
 	return tokens, nil
 }
 
-func Parse(tokens []string) (*list.List, error) {
-	stack := list.New()
-	push(stack, list.New())
+func Parse(tokens []string) ([]interface{}, error) {
+	stk := stack.New()
+	stk.Push(stack.New())
 	for _, token := range tokens {
 		if token == "(" {
-			push(stack, list.New())
+			stk.Push(stack.New())
 		} else if token == ")" {
-			childExpr := pop(stack).(*list.List)
-			if stack.Len() == 0 {
+			childExpr := stk.Pop().(stack.Stack)
+			if stk.Len() == 0 {
 				return nil, fmt.Errorf("Parse: overcomplete expression")
 			}
-			parentExpr := pop(stack).(*list.List)
-			parentExpr.PushBack(childExpr)
-			push(stack, parentExpr)
+			parentExpr := stk.Pop().(stack.Stack)
+			parentExpr.Push(childExpr)
+			stk.Push(parentExpr)
 		} else if token[0] == ';' { // ignore comments
 			continue
 		} else {
-			expr := pop(stack).(*list.List)
-			expr.PushBack(token)
-			push(stack, expr)
+			expr := stk.Pop().(stack.Stack)
+			expr.Push(token)
+			stk.Push(expr)
 		}
 	}
-	if stack.Len() > 1 {
+	if stk.Len() > 1 {
 		return nil, fmt.Errorf("Parse: incomplete expression")
 	}
-	return pop(stack).(*list.List), nil
-}
-
-func init() {
-	specialForms = map[string]Proc{
-		"define": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			name := expr.Front().Next().Value.(string)
-			value := expr.Front().Next().Next().Value
-			env[name] = Eval(value, env)
-			return nil
-		}),
-		"lambda": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			params := expr.Front().Next().Value.(*list.List)
-			body := expr.Front().Next().Next().Value
-			return Proc(func(args *list.List, env map[string]interface{}) interface{} {
-				// set arguments and evaluate
-				procEnv := copyEnv(env)
-				e1 := params.Front()
-				e2 := args.Front()
-				for e1 != nil {
-					procEnv[e1.Value.(string)] = e2.Value
-					e1 = e1.Next()
-					e2 = e2.Next()
-				}
-				return Eval(body, procEnv)
-			})
-		}),
-		"if": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			condition := expr.Front().Next().Value
-			conseq := expr.Front().Next().Next().Value
-			alt := expr.Front().Next().Next().Next().Value
-			if Eval(condition, env).(bool) {
-				return Eval(conseq, env)
-			} else {
-				return Eval(alt, env)
-			}
-		}),
-		"cond": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			var e *list.Element
-
-			// check n - 1 branches
-			for e = expr.Front().Next(); e.Next() != nil; e = e.Next() {
-				branch := e.Value.(*list.List)
-				conditionExpr := branch.Front().Value
-				if Eval(conditionExpr, env).(bool) {
-					return Eval(branch.Front().Next().Value, env)
-				}
-			}
-
-			// check last branch for 'else'
-			branch := e.Value.(*list.List)
-			if scond, ok := branch.Front().Value.(string); ok && (scond == "else") {
-				return Eval(branch.Front().Next().Value, env)
-			} else {
-				conditionExpr := branch.Front().Value
-				if Eval(conditionExpr, env).(bool) {
-					return Eval(branch.Front().Next().Value, env)
-				}
-			}
-			panic("Eval: no branch matched in 'cond' expression")
-		}),
-		"begin": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			beginEnv := copyEnv(env)
-			var retval interface{} = nil
-			for e := expr.Front().Next(); e != nil; e = e.Next() {
-				retval = Eval(e.Value, beginEnv)
-			}
-			return retval
-		}),
-		"let": Proc(func(expr *list.List, env map[string]interface{}) interface{} {
-			letEnv := copyEnv(env)
-			defList := expr.Front().Next().Value.(*list.List)
-			for e := defList.Front(); e != nil; e = e.Next() {
-				pair := e.Value.(*list.List)
-				name := pair.Front().Value.(string)
-				value := pair.Front().Next().Value
-				letEnv[name] = Eval(value, env)
-			}
-			return Eval(expr.Front().Next().Next().Value, letEnv)
-		}),
-	}
+	return stk.Pop().(stack.Stack).ToSlice(), nil
 }
 
 func Eval(expr interface{}, env map[string]interface{}) interface{} {
 	switch expr.(type) {
-	case *list.List:
-		l := expr.(*list.List)
-		if l.Len() > 1 {
-			// must be a function application
-			function := l.Front().Value.(string)
-			if sf, ok := specialForms[function]; ok {
-				// eval special form
-				return sf(l, env)
-			} else {
-				// lookup and eval as regular procedure
-				proc, ok := Eval(function, env).(Proc)
-				if !ok {
-					panic(fmt.Sprintf(`Eval: expected procedure, received token %s`, function))
-				}
-				args := list.New()
-				for e := l.Front().Next(); e != nil; e = e.Next() {
-					args.PushBack(Eval(e.Value, env))
-				}
-				return proc(args, env)
+	case []interface{}:
+		// must be a function application
+		lst := expr.([]interface{})
+		function := Eval(lst[0], env)
+		switch function.(type) {
+		case SpecialForm:
+			return function.(SpecialForm)(lst[1:], env)
+		case Proc:
+			proc := function.(Proc)
+			args := lst[1:]
+			procEnv := copyEnv(env)
+			evaluatedArgs := make([]interface{}, len(args))
+			for i := range args {
+				evaluatedArgs[i] = Eval(args[i], env)
 			}
-		} else {
-			// might be a function application
-			name := l.Front().Value.(string)
-			if val, ok := Eval(name, env).(Proc); ok {
-				// apply if proc
-				return val(list.New(), env)
+			if proc.isVariadic {
+				procEnv[proc.params[0]] = evaluatedArgs
 			} else {
-				// return val if not proc
-				return val
+				for i := range evaluatedArgs {
+					procEnv[proc.params[i]] = evaluatedArgs[i]
+				}
 			}
+			return proc.body(procEnv)
+		default:
+			panic("Eval: expected special form or procedure")
 		}
 	case string:
 		// must be either literal or a binding
@@ -249,20 +162,18 @@ func Exec(src string) (interface{}, error) {
 	}
 
 	var retval interface{}
-	for e := exprs.Front(); e != nil; e = e.Next() {
-		retval = Eval(e.Value, env)
+	for _, expr := range exprs {
+		retval = Eval(expr, env)
 	}
+
 	return retval, nil
 }
 
-type Proc func(args *list.List, env map[string]interface{}) interface{}
-
-func push(l *list.List, v interface{}) {
-	l.PushFront(v)
-}
-
-func pop(l *list.List) interface{} {
-	return l.Remove(l.Front())
+type SpecialForm func(args []interface{}, env map[string]interface{}) interface{}
+type Proc struct {
+	params     []string
+	isVariadic bool
+	body       func(env map[string]interface{}) interface{}
 }
 
 func copyEnv(src map[string]interface{}) map[string]interface{} {
@@ -276,58 +187,121 @@ func copyEnv(src map[string]interface{}) map[string]interface{} {
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func CreateDefaultEnv() map[string]interface{} {
+	// return nil
 	createIntBinaryProc := func(bf func(a, b int) interface{}) Proc {
-		return Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.(int)
-			b := args.Front().Next().Value.(int)
-			return bf(a, b)
-		})
+		return Proc{
+			[]string{"a", "b"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				return bf(env["a"].(int), env["b"].(int))
+			},
+		}
 	}
 
 	return map[string]interface{}{
 		// return random integer in [0, n)
-		"random": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value
-			return rng.Intn(a.(int))
-		}),
-		"cons": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value
-			b := args.Front().Next().Value
-			return [2]interface{}{a, b}
-		}),
-		"car": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.([2]interface{})
-			return a[0]
-		}),
-		"cdr": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.([2]interface{})
-			return a[1]
-		}),
-		"null?": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.([2]interface{})
-			return (a[0] == nil) && (a[1] == nil)
-		}),
-		"list": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			result := [2]interface{}{nil, nil}
-			for e := args.Back(); e != nil; e = e.Prev() {
-				result = [2]interface{}{e.Value, result}
-			}
-			return result
-		}),
-		"+": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			res := 0
-			for e := args.Front(); e != nil; e = e.Next() {
-				res += e.Value.(int)
-			}
-			return res
-		}),
-		"*": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			res := 1
-			for e := args.Front(); e != nil; e = e.Next() {
-				res *= e.Value.(int)
-			}
-			return res
-		}),
+		"random": Proc{
+			[]string{"i"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				return rng.Intn(env["i"].(int))
+			},
+		},
+		"cons": Proc{
+			[]string{"a", "b"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				return [2]interface{}{env["a"], env["b"]}
+			},
+		},
+
+		"car": Proc{
+			[]string{"a"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				return env["a"].([2]interface{})[0]
+			},
+		},
+
+		"cdr": Proc{
+			[]string{"a"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				return env["a"].([2]interface{})[1]
+			},
+		},
+
+		"null?": Proc{
+			[]string{"a"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				a := env["a"].([2]interface{})
+				return (a[0] == nil) && (a[1] == nil)
+			},
+		},
+
+		"list": Proc{
+			[]string{"elements"},
+			true,
+			func(env map[string]interface{}) interface{} {
+				elements := env["elements"].([]interface{})
+				result := [2]interface{}{nil, nil}
+				for i := len(elements) - 1; i >= 0; i-- {
+					result = [2]interface{}{elements[i], result}
+				}
+				return result
+			},
+		},
+		"+": Proc{
+			[]string{"nums"},
+			true,
+			func(env map[string]interface{}) interface{} {
+				result := 0
+				nums := env["nums"].([]interface{})
+				for _, num := range nums {
+					result += num.(int)
+				}
+				return result
+			},
+		},
+		"*": Proc{
+			[]string{"nums"},
+			true,
+			func(env map[string]interface{}) interface{} {
+				result := 1
+				nums := env["nums"].([]interface{})
+				for _, num := range nums {
+					result *= num.(int)
+				}
+				return result
+			},
+		},
+		"not": Proc{
+			[]string{"a"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				a := env["a"].(bool)
+				return !a
+			},
+		},
+		"and": Proc{
+			[]string{"a", "b"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				a := env["a"].(bool)
+				b := env["b"].(bool)
+				return a && b
+			},
+		},
+		"or": Proc{
+			[]string{"a", "b"},
+			false,
+			func(env map[string]interface{}) interface{} {
+				a := env["a"].(bool)
+				b := env["b"].(bool)
+				return a || b
+			},
+		},
 		"-":         createIntBinaryProc(func(a, b int) interface{} { return a - b }),
 		"/":         createIntBinaryProc(func(a, b int) interface{} { return a / b }),
 		">":         createIntBinaryProc(func(a, b int) interface{} { return a > b }),
@@ -336,18 +310,91 @@ func CreateDefaultEnv() map[string]interface{} {
 		"<=":        createIntBinaryProc(func(a, b int) interface{} { return a <= b }),
 		"=":         createIntBinaryProc(func(a, b int) interface{} { return a == b }),
 		"remainder": createIntBinaryProc(func(a, b int) interface{} { return a % b }),
-		"not": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			return !(args.Front().Value.(bool))
+
+		// modifies given env
+		"define": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			name := args[0].(string)
+			value := args[1]
+			env[name] = Eval(value, env)
+			return nil
 		}),
-		"and": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.(bool)
-			b := args.Front().Next().Value.(bool)
-			return a && b
+		"lambda": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			if _, ok := args[0].([]interface{}); ok {
+				// normal args
+				params := args[0].([]interface{})
+				stringParams := make([]string, len(params))
+				for i := range params {
+					stringParams[i] = params[i].(string)
+				}
+				body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
+				return Proc{
+					stringParams,
+					false,
+					body,
+				}
+			} else {
+				// variadic args
+				param := args[0].(string)
+				body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
+				return Proc{
+					[]string{param},
+					true,
+					body,
+				}
+			}
 		}),
-		"or": Proc(func(args *list.List, _ map[string]interface{}) interface{} {
-			a := args.Front().Value.(bool)
-			b := args.Front().Next().Value.(bool)
-			return a || b
+		"if": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			condition := args[0]
+			conseq := args[1]
+			alt := args[2]
+			if Eval(condition, env).(bool) {
+				return Eval(conseq, env)
+			} else {
+				return Eval(alt, env)
+			}
+		}),
+		"cond": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			// check n - 1 branches
+			for _, arg := range args[:len(args)-1] {
+				branch := arg.([]interface{})
+				condition := branch[0]
+				body := branch[1]
+				if Eval(condition, env).(bool) {
+					return Eval(body, env)
+				}
+			}
+
+			// check last branch for 'else'
+			branch := args[len(args)-1].([]interface{})
+			condition := branch[0]
+			body := branch[1]
+			if scond, ok := condition.(string); ok && (scond == "else") {
+				return Eval(body, env)
+			} else {
+				if Eval(condition, env).(bool) {
+					return Eval(body, env)
+				}
+			}
+			panic("Eval: no branch matched in 'cond' expression")
+		}),
+		"begin": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			beginEnv := copyEnv(env)
+			var retval interface{} = nil
+			for _, arg := range args {
+				retval = Eval(arg, beginEnv)
+			}
+			return retval
+		}),
+		"let": SpecialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+			letEnv := copyEnv(env)
+			defs := args[0].([]interface{})
+			for _, def := range defs {
+				pair := def.([]interface{})
+				name := pair[0].(string)
+				value := pair[1]
+				letEnv[name] = Eval(value, env)
+			}
+			return Eval(args[1], letEnv)
 		}),
 	}
 }
