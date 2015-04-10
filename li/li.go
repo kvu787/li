@@ -2,7 +2,7 @@ package li
 
 import (
 	"fmt"
-	"li/stack"
+	"github.com/kvu787/li/stack"
 	"regexp"
 	"strconv"
 )
