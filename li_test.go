@@ -8,26 +8,35 @@ import (
 
 func TestLex(t *testing.T) {
 	{ // test valid source
-		tokens := []string{
-			"; ignore this comment", "(", "+", "(", "*", "1", "(", "/", "1",
-			"zero", ")", ")", "(", "/", "2", "PI", ")",
-			"; and this comment",
-			"(", "-", "thirty-three", "EULERS_NUMBER", ")", ")",
-		}
 		src := `; ignore this comment
-(+ 
-  (* 
-  	1 
-  	(/ 1 zero)) 
+(+
+  (*
+  	1
+	  (/ 1 zero))
   (/ 2 PI)
   ; and this comment
-  (- thirty-three EULERS_NUMBER))`
+  (- thirty-three EULERS_NUMBER))
+(= 1 2)`
+
+		expected := []string{
+			"; ignore this comment",
+			"\n", "(", "+",
+			"\n  ", "(", "*",
+			"\n  \t", "1",
+			"\n\t  ", "(", "/", " ", "1", " ", "zero", ")", ")",
+			"\n  ", "(", "/", " ", "2", " ", "PI", ")",
+			"\n  ", "; and this comment",
+			"\n  ", "(", "-", " ", "thirty-three", " ", "EULERS_NUMBER", ")", ")",
+			"\n", "(", "=", " ", "1", " ", "2", ")",
+		}
 
 		actual, err := Lex(src)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !stringSliceEquals(actual, tokens) {
+		if !stringSliceEquals(actual, expected) {
+			t.Log("expected: ", expected)
+			t.Log("actual: ", actual)
 			t.Fatal("Lex failed: expected != actual")
 		}
 	}
@@ -37,7 +46,8 @@ func TestLex(t *testing.T) {
 (~~~ + (* 1 (/ 1 zero)) 
   (/ 2 PI)
   ; and this comment
-  (- thirty-three EULERS_NUMBER))`
+  (- thirty-three EULERS_NUMBER))
+(= 1 2)`
 		_, err := Lex(src)
 		if err == nil {
 			t.Fatal("Lex failed: did not receive expected error")
@@ -45,13 +55,43 @@ func TestLex(t *testing.T) {
 	}
 }
 
+func TestPreprocess(t *testing.T) {
+	tokens := []string{
+		"; ignore this comment",
+		"\n", "(", "+",
+		"\n  ", "(", "*",
+		"\n  \t", "1",
+		"\n\t  ", "(", "/", " ", "1", " ", "zero", ")", ")",
+		"\n  ", "(", "/", " ", "2", " ", "PI", ")",
+		"\n  ", "; and this comment",
+		"\n  ", "(", "-", " ", "thirty-three", " ", "EULERS_NUMBER", ")", ")",
+		"\n", "(", "=", " ", "1", " ", "2", ")",
+	}
+	expected := []string{
+		"(", "+",
+		"(", "*",
+		"1",
+		"(", "/", "1", "zero", ")", ")",
+		"(", "/", "2", "PI", ")",
+		"(", "-", "thirty-three", "EULERS_NUMBER", ")", ")",
+		"(", "=", "1", "2", ")",
+	}
+	actual := Preprocess(tokens)
+	if !stringSliceEquals(actual, expected) {
+		t.Log("expected: ", expected)
+		t.Log("actual: ", actual)
+		t.Fatal("Preprocess failed: expected != actual")
+	}
+}
+
 func TestParse(t *testing.T) {
 	{ // test valid tokens
 		tokens := []string{
-			"; ignore this comment",
-			"(", "+", "(", "*", "1", "(", "/", "1",
-			"zero", ")", ")", "(", "/", "2", "PI", ")",
-			"; and this comment",
+			"(", "+",
+			"(", "*",
+			"1",
+			"(", "/", "1", "zero", ")", ")",
+			"(", "/", "2", "PI", ")",
 			"(", "-", "thirty-three", "EULERS_NUMBER", ")", ")",
 			"(", "=", "1", "2", ")",
 		}
@@ -69,6 +109,8 @@ func TestParse(t *testing.T) {
 			t.Fatalf("Parse failed: received unexpected error")
 		}
 		if !sliceEquals(actual, expected) {
+			t.Log("expected: ", expected)
+			t.Log("actual: ", actual)
 			t.Fatalf("Parse failed: expected != actual")
 		}
 	}
@@ -181,13 +223,6 @@ func TestExec(t *testing.T) {
 
 		(fast-prime? 10000 100)`: false,
 	}
-
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		fmt.Println(err)
-	// 		t.Fatalf("Exec failed")
-	// 	}
-	// }()
 
 	for k, v := range srcTable {
 		res, err := Exec(k)

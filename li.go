@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 func Lex(src string) ([]string, error) {
@@ -31,14 +32,14 @@ func Lex(src string) ([]string, error) {
 
 		// check if any regex matches input
 		reMatched := false
-		for j, re := range regexes {
+		for _, re := range regexes {
 			loc := re.FindStringIndex(src[i:])
 			if loc != nil && loc[0] == 0 {
 
-				// skip whitespace regex
-				if j != len(reStrings)-1 {
-					tokens = append(tokens, src[i:][loc[0]:loc[1]])
-				}
+				// // skip whitespace regex
+				// if j != len(reStrings)-1 {
+				tokens = append(tokens, src[i:][loc[0]:loc[1]])
+				// }
 
 				reMatched = true
 				i += (loc[1] - loc[0])
@@ -55,6 +56,21 @@ func Lex(src string) ([]string, error) {
 	return tokens, nil
 }
 
+// Remove whitespace and comment tokens
+func Preprocess(tokens []string) []string {
+	preprocessedTokens := make([]string, 0, len(tokens))
+	for _, token := range tokens {
+		if strings.ContainsRune("\t\n\v\f\r ", rune(token[0])) {
+			continue
+		}
+		if token[0] == ';' {
+			continue
+		}
+		preprocessedTokens = append(preprocessedTokens, token)
+	}
+	return preprocessedTokens
+}
+
 func Parse(tokens []string) ([]interface{}, error) {
 	stk := NewStack()
 	stk.Push(NewStack())
@@ -69,8 +85,6 @@ func Parse(tokens []string) ([]interface{}, error) {
 			parentExpr := stk.Pop().(Stack)
 			parentExpr.Push(childExpr)
 			stk.Push(parentExpr)
-		} else if token[0] == ';' { // ignore comments
-			continue
 		} else {
 			expr := stk.Pop().(Stack)
 			expr.Push(token)
@@ -158,7 +172,9 @@ func Exec(src string) (interface{}, error) {
 		return nil, err
 	}
 
-	exprs, err := Parse(tokens)
+	preprocessedTokens := Preprocess(tokens)
+
+	exprs, err := Parse(preprocessedTokens)
 	if err != nil {
 		return nil, err
 	}
