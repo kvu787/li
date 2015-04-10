@@ -1,4 +1,4 @@
-package li
+package main
 
 type specialForm func(args []interface{}, env map[string]interface{}) interface{}
 

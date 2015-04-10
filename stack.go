@@ -1,4 +1,4 @@
-package stack
+package main
 
 type Stack interface {
 	Len() int
@@ -9,7 +9,7 @@ type Stack interface {
 
 type slice []interface{}
 
-func New() Stack {
+func NewStack() Stack {
 	return new(slice)
 }
 

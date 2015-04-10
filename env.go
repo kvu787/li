@@ -1,4 +1,4 @@
-package li
+package main
 
 import (
 	"math/rand"

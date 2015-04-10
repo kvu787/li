@@ -1,8 +1,7 @@
-package li
+package main
 
 import (
 	"fmt"
-	"github.com/kvu787/li/stack"
 	"regexp"
 	"strconv"
 )
@@ -57,23 +56,23 @@ func Lex(src string) ([]string, error) {
 }
 
 func Parse(tokens []string) ([]interface{}, error) {
-	stk := stack.New()
-	stk.Push(stack.New())
+	stk := NewStack()
+	stk.Push(NewStack())
 	for _, token := range tokens {
 		if token == "(" {
-			stk.Push(stack.New())
+			stk.Push(NewStack())
 		} else if token == ")" {
-			childExpr := stk.Pop().(stack.Stack)
+			childExpr := stk.Pop().(Stack)
 			if stk.Len() == 0 {
 				return nil, fmt.Errorf("Parse: overcomplete expression")
 			}
-			parentExpr := stk.Pop().(stack.Stack)
+			parentExpr := stk.Pop().(Stack)
 			parentExpr.Push(childExpr)
 			stk.Push(parentExpr)
 		} else if token[0] == ';' { // ignore comments
 			continue
 		} else {
-			expr := stk.Pop().(stack.Stack)
+			expr := stk.Pop().(Stack)
 			expr.Push(token)
 			stk.Push(expr)
 		}
@@ -81,7 +80,7 @@ func Parse(tokens []string) ([]interface{}, error) {
 	if stk.Len() > 1 {
 		return nil, fmt.Errorf("Parse: incomplete expression")
 	}
-	return stk.Pop().(stack.Stack).ToSlice(), nil
+	return stk.Pop().(Stack).ToSlice(), nil
 }
 
 func Eval(expr interface{}, env map[string]interface{}) interface{} {
