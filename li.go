@@ -35,12 +35,7 @@ func Lex(src string) ([]string, error) {
 		for _, re := range regexes {
 			loc := re.FindStringIndex(src[i:])
 			if loc != nil && loc[0] == 0 {
-
-				// // skip whitespace regex
-				// if j != len(reStrings)-1 {
 				tokens = append(tokens, src[i:][loc[0]:loc[1]])
-				// }
-
 				reMatched = true
 				i += (loc[1] - loc[0])
 				break
@@ -164,21 +159,28 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 }
 
 func Exec(src string) (interface{}, error) {
-	env := createDefaultEnv()
+	// initialize execution environment
+	env := make(map[string]interface{})
+	copyEnv(defaultEnv, env)
 
 	var err error
+
+	// lex source into tokens
 	tokens, err := Lex(src)
 	if err != nil {
 		return nil, err
 	}
 
+	// remove comments and whitespace
 	preprocessedTokens := Preprocess(tokens)
 
+	// parse into AST
 	exprs, err := Parse(preprocessedTokens)
 	if err != nil {
 		return nil, err
 	}
 
+	// evaluate expressions
 	var retval interface{}
 	for _, expr := range exprs {
 		retval = Eval(expr, env)

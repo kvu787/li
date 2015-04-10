@@ -5,11 +5,6 @@ import (
 	"time"
 )
 
-func createDefaultEnv() map[string]interface{} {
-	env := copyEnv(defaultEnv)
-	return env
-}
-
 func copyEnv(src map[string]interface{}) map[string]interface{} {
 	copy := make(map[string]interface{})
 	for k := range src {
