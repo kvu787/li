@@ -102,19 +102,28 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 		case Proc:
 			proc := function.(Proc)
 			args := lst[1:]
+			if len(args) != len(proc.params) {
+				panic("Eval: wrong number of params")
+			}
 			procEnv := copyEnv(env)
 			evaluatedArgs := make([]interface{}, len(args))
 			for i := range args {
 				evaluatedArgs[i] = Eval(args[i], env)
 			}
-			if proc.isVariadic {
-				procEnv[proc.params[0]] = evaluatedArgs
-			} else {
-				for i := range evaluatedArgs {
-					procEnv[proc.params[i]] = evaluatedArgs[i]
-				}
+			for i := range evaluatedArgs {
+				procEnv[proc.params[i]] = evaluatedArgs[i]
 			}
 			return proc.body(procEnv)
+		case VariadicProc:
+			vproc := function.(VariadicProc)
+			args := lst[1:]
+			procEnv := copyEnv(env)
+			evaluatedArgs := make([]interface{}, len(args))
+			for i := range args {
+				evaluatedArgs[i] = Eval(args[i], env)
+			}
+			procEnv[vproc.param] = evaluatedArgs
+			return vproc.body(procEnv)
 		default:
 			panic("Eval: expected special form or procedure")
 		}
@@ -170,10 +179,15 @@ func Exec(src string) (interface{}, error) {
 }
 
 type SpecialForm func(args []interface{}, env map[string]interface{}) interface{}
+
+type VariadicProc struct {
+	param string
+	body  func(env map[string]interface{}) interface{}
+}
+
 type Proc struct {
-	params     []string
-	isVariadic bool
-	body       func(env map[string]interface{}) interface{}
+	params []string
+	body   func(env map[string]interface{}) interface{}
 }
 
 func copyEnv(src map[string]interface{}) map[string]interface{} {
@@ -191,7 +205,6 @@ func CreateDefaultEnv() map[string]interface{} {
 	createIntBinaryProc := func(bf func(a, b int) interface{}) Proc {
 		return Proc{
 			[]string{"a", "b"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				return bf(env["a"].(int), env["b"].(int))
 			},
@@ -202,14 +215,12 @@ func CreateDefaultEnv() map[string]interface{} {
 		// return random integer in [0, n)
 		"random": Proc{
 			[]string{"i"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				return rng.Intn(env["i"].(int))
 			},
 		},
 		"cons": Proc{
 			[]string{"a", "b"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				return [2]interface{}{env["a"], env["b"]}
 			},
@@ -217,7 +228,6 @@ func CreateDefaultEnv() map[string]interface{} {
 
 		"car": Proc{
 			[]string{"a"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				return env["a"].([2]interface{})[0]
 			},
@@ -225,7 +235,6 @@ func CreateDefaultEnv() map[string]interface{} {
 
 		"cdr": Proc{
 			[]string{"a"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				return env["a"].([2]interface{})[1]
 			},
@@ -233,16 +242,14 @@ func CreateDefaultEnv() map[string]interface{} {
 
 		"null?": Proc{
 			[]string{"a"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				a := env["a"].([2]interface{})
 				return (a[0] == nil) && (a[1] == nil)
 			},
 		},
 
-		"list": Proc{
-			[]string{"elements"},
-			true,
+		"list": VariadicProc{
+			"elements",
 			func(env map[string]interface{}) interface{} {
 				elements := env["elements"].([]interface{})
 				result := [2]interface{}{nil, nil}
@@ -252,9 +259,8 @@ func CreateDefaultEnv() map[string]interface{} {
 				return result
 			},
 		},
-		"+": Proc{
-			[]string{"nums"},
-			true,
+		"+": VariadicProc{
+			"nums",
 			func(env map[string]interface{}) interface{} {
 				result := 0
 				nums := env["nums"].([]interface{})
@@ -264,9 +270,8 @@ func CreateDefaultEnv() map[string]interface{} {
 				return result
 			},
 		},
-		"*": Proc{
-			[]string{"nums"},
-			true,
+		"*": VariadicProc{
+			"nums",
 			func(env map[string]interface{}) interface{} {
 				result := 1
 				nums := env["nums"].([]interface{})
@@ -278,7 +283,6 @@ func CreateDefaultEnv() map[string]interface{} {
 		},
 		"not": Proc{
 			[]string{"a"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				a := env["a"].(bool)
 				return !a
@@ -286,7 +290,6 @@ func CreateDefaultEnv() map[string]interface{} {
 		},
 		"and": Proc{
 			[]string{"a", "b"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				a := env["a"].(bool)
 				b := env["b"].(bool)
@@ -295,7 +298,6 @@ func CreateDefaultEnv() map[string]interface{} {
 		},
 		"or": Proc{
 			[]string{"a", "b"},
-			false,
 			func(env map[string]interface{}) interface{} {
 				a := env["a"].(bool)
 				b := env["b"].(bool)
@@ -329,16 +331,14 @@ func CreateDefaultEnv() map[string]interface{} {
 				body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
 				return Proc{
 					stringParams,
-					false,
 					body,
 				}
 			} else {
 				// variadic args
 				param := args[0].(string)
 				body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
-				return Proc{
-					[]string{param},
-					true,
+				return VariadicProc{
+					param,
 					body,
 				}
 			}
