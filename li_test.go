@@ -167,61 +167,90 @@ func TestExec(t *testing.T) {
 		`(remainder 33 7)`:             5,
 
 		`
-		(define fib (lambda (n)
-          (cond ((= n 0) 0)
-                ((= n 1) 1)
-                (else (+ (fib (- n 1)) (fib (- n 2)))))))
-        (fib 13)`: 233,
+; Compute terms of the Fibonacci sequence.
+
+(define fib (lambda (n)
+  (cond ((= n 0) 0)
+        ((= n 1) 1)
+        (else (+ (fib (- n 1)) (fib (- n 2)))))))
+
+(fib 13) ; => 233`: 233,
 
 		`
-		(define even? (lambda (x) (= (remainder x 2) 0)))
+; Compute integer exponents.
 
-		(define square (lambda (x) (* x x)))
+(define even? (lambda (x) (= (remainder x 2) 0)))
 
-		(define expt (lambda (b n)
-		  (cond ((= n 0) 1)
-		        ((even? n) (square (expt b (/ n 2))))
-		        (else (* b (expt b (- n 1)))))))
+(define square (lambda (x) (* x x)))
 
-		(expt 3 8)`: 6561,
+(define expt (lambda (b n)
+  (cond ((= n 0) 1)
+        ((even? n) (square (expt b (/ n 2))))
+        (else (* b (expt b (- n 1)))))))
+
+(expt 3 8) ; => 6561`: 6561,
 
 		`
-		; this is a comment
-			(and
-				(= 1 1)
-				; and another comment
-				(= 3 (+ 1 2)))`: true,
+; Use Fermat's little theorem to develop a fast, probabilistic algorithm
+; for checking integer primality.
 
-		`; SICP 1.2.6, p 51
+; From "Structure and Interpretation of Computer Programs, Second Edition"
+; By Harold Abelson, Gerald Jay Sussman with Julie Sussman
+; Page 51
+; Section 1.2.6
 
-		(define even?
-		  (lambda (x) (= (remainder x 2) 0)))
+(define even?
+  (lambda (x) (= (remainder x 2) 0)))
 
-		(define square
-		  (lambda (x) (* x x)))
+(define square
+  (lambda (x) (* x x)))
 
-		(define expmod (lambda (base exp m)
-		  (cond ((= exp 0) 1)
-		        ((even? exp)
-		         (remainder (square (expmod base (/ exp 2) m))
-		                    m))
-		        (else
-		         (remainder (* base (expmod base (- exp 1) m))
-		                    m)))))
+(define expmod (lambda (base exp m)
+  (cond ((= exp 0) 1)
+        ((even? exp)
+         (remainder (square (expmod base (/ exp 2) m))
+                    m))
+        (else
+         (remainder (* base (expmod base (- exp 1) m))
+                    m)))))
 
-		(define fermat-test (lambda (n)
-		  (let
-		      ((try-it
-		        (lambda (a) (= (expmod a n n) a))))
-		    (try-it (+ 1 (random (- n 1)))))))
+(define fermat-test (lambda (n)
+  (let 
+      ((try-it
+        (lambda (a) (= (expmod a n n) a))))
+    (try-it (+ 1 (random (- n 1)))))))
 
-		(define fast-prime?
-		  (lambda (n times)
-		    (cond ((= times 0) #t)
-		          ((fermat-test n) (fast-prime? n (- times 1)))
-		          (else #f))))
+(define fast-prime?
+  (lambda (n times)
+    (cond ((= times 0) #t)
+          ((fermat-test n) (fast-prime? n (- times 1)))
+          (else #f))))
 
-		(fast-prime? 10000 100)`: false,
+(fast-prime? 999995 10) ; => false`: false,
+
+		`
+; Use Horner's rule and list accumulation to evaluate polynomials
+
+; From "Structure and Interpretation of Computer Programs, Second Edition"
+; By Harold Abelson, Gerald Jay Sussman with Julie Sussman
+; Page 119
+; Section 2.2.3
+
+(define accumulate
+  (lambda (op initial sequence)
+    (if (null? sequence)
+      initial
+      (op (car sequence)
+          (accumulate op initial (cdr sequence))))))
+
+(define horner-eval
+  (lambda (x coefficient-sequence)
+    (accumulate (lambda (this-coeff higher-terms)
+                        (+ this-coeff (* x higher-terms)))
+                0
+                coefficient-sequence)))
+
+(horner-eval 2 (list 1 3 0 5 0 1)) ; => 79`: 79,
 	}
 
 	for k, v := range srcTable {

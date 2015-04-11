@@ -1,3 +1,5 @@
+; Compute integer exponents.
+
 (define even? (lambda (x) (= (remainder x 2) 0)))
 
 (define square (lambda (x) (* x x)))
@@ -7,4 +9,4 @@
         ((even? n) (square (expt b (/ n 2))))
         (else (* b (expt b (- n 1)))))))
 
-(expt 3 8)
+(expt 3 8) ; => 6561

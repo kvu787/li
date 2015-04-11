@@ -1,4 +1,10 @@
-; SICP 1.2.6, p 51
+; Use Fermat's little theorem to develop a fast, probabilistic algorithm
+; for checking integer primality.
+
+; From "Structure and Interpretation of Computer Programs, Second Edition"
+; By Harold Abelson, Gerald Jay Sussman with Julie Sussman
+; Page 51
+; Section 1.2.6
 
 (define even?
   (lambda (x) (= (remainder x 2) 0)))
@@ -27,4 +33,4 @@
           ((fermat-test n) (fast-prime? n (- times 1)))
           (else #f))))
 
-(fast-prime? 17 0)
+(fast-prime? 999995 10) ; => false
