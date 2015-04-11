@@ -92,12 +92,18 @@ func Parse(tokens []string) ([]interface{}, error) {
 	return stk.Pop().(Stack).ToSlice(), nil
 }
 
-func Eval(expr interface{}, env map[string]interface{}) interface{} {
+func Eval(expr interface{}, env map[string]interface{}) (interface{}, error) {
 	switch expr.(type) {
 	case []interface{}:
 		// must be a function application
 		lst := expr.([]interface{})
-		function := Eval(lst[0], env)
+		if len(lst) == 0 {
+			return nil, fmt.Errorf("Eval: cannot evaluate empty expression ()")
+		}
+		function, err := Eval(lst[0], env)
+		if err != nil {
+			return nil, err
+		}
 		switch function.(type) {
 		case specialForm:
 			return function.(specialForm)(lst[1:], env)
@@ -105,12 +111,16 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			proc := function.(proc)
 			args := lst[1:]
 			if len(args) != len(proc.params) {
-				panic("Eval: wrong number of params")
+				return nil, fmt.Errorf("Eval: wrong number of params")
 			}
 			procEnv := copyEnv(env)
 			evaluatedArgs := make([]interface{}, len(args))
 			for i := range args {
-				evaluatedArgs[i] = Eval(args[i], env)
+				evaluatedArg, err := Eval(args[i], env)
+				evaluatedArgs[i] = evaluatedArg
+				if err != nil {
+					return nil, err
+				}
 			}
 			for i := range evaluatedArgs {
 				procEnv[proc.params[i]] = evaluatedArgs[i]
@@ -122,46 +132,51 @@ func Eval(expr interface{}, env map[string]interface{}) interface{} {
 			procEnv := copyEnv(env)
 			evaluatedArgs := make([]interface{}, len(args))
 			for i := range args {
-				evaluatedArgs[i] = Eval(args[i], env)
+				evaluatedArg, err := Eval(args[i], env)
+				evaluatedArgs[i] = evaluatedArg
+				if err != nil {
+					return nil, err
+				}
 			}
 			procEnv[vproc.param] = evaluatedArgs
 			return vproc.body(procEnv)
 		default:
-			panic("Eval: expected special form or procedure")
+			return nil, fmt.Errorf(
+				"Eval: expected special form or procedure but received type %T",
+				function)
 		}
 	case string:
 		// must be either literal or a binding
 		s := expr.(string)
 		if s == "#t" {
 			// true literal
-			return true
+			return true, nil
 		} else if s == "#f" {
 			// false literal
-			return false
+			return false, nil
 		} else if i, err := strconv.Atoi(s); err == nil {
 			// integer literal
-			return i
+			return i, nil
 		} else {
 			// identifier
 			val, ok := env[s]
 			if !ok {
-				panic(fmt.Sprintf("Eval: identifier not found: %s", s))
+				return nil, fmt.Errorf("Eval: identifier not found: %s", s)
 			} else {
-				return val
+				return val, nil
 			}
 		}
 	default:
-		panic(fmt.Sprintf(`Eval: received invalid expression
+		return nil, fmt.Errorf(`Eval: received invalid expression
 	type: %T
 	value: %v`,
-			expr, expr))
+			expr, expr)
 	}
 }
 
 func Exec(src string) (interface{}, error) {
 	// initialize execution environment
-	env := make(map[string]interface{})
-	copyEnv(defaultEnv, env)
+	env := copyEnv(defaultEnv)
 
 	var err error
 
@@ -183,7 +198,10 @@ func Exec(src string) (interface{}, error) {
 	// evaluate expressions
 	var retval interface{}
 	for _, expr := range exprs {
-		retval = Eval(expr, env)
+		retval, err = Eval(expr, env)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return retval, nil

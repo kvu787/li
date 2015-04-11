@@ -227,7 +227,7 @@ func TestExec(t *testing.T) {
 	for k, v := range srcTable {
 		res, err := Exec(k)
 		if err != nil {
-			t.Fatalf(`Exec returned unexpected error: #v`, err)
+			t.Fatalf(`Exec returned unexpected error: %v`, err)
 		}
 		if res != v {
 			t.Fatalf(`Exec

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -13,11 +14,31 @@ func copyEnv(src map[string]interface{}) map[string]interface{} {
 	return copy
 }
 
-func createIntBinaryproc(bf func(a, b int) interface{}) proc {
+func createTypeError(name string, expectedType string, actual interface{}) error {
+	return fmt.Errorf(
+		"Eval: procedure '%s' expected argument type '%s', but got %T",
+		name, expectedType, actual)
+}
+
+func createArgLenError(name string, expected int, args []interface{}) error {
+	return fmt.Errorf(
+		"Eval: procedure '%v' expected %v arguments, but got %v arguments",
+		name, expected, len(args))
+}
+
+func createIntBinaryProc(name string, bf func(a, b int) interface{}) proc {
 	return proc{
 		[]string{"a", "b"},
-		func(env map[string]interface{}) interface{} {
-			return bf(env["a"].(int), env["b"].(int))
+		func(env map[string]interface{}) (interface{}, error) {
+			a, ok := env["a"].(int)
+			if !ok {
+				return nil, createTypeError(name, "int", env["a"])
+			}
+			b, ok := env["b"].(int)
+			if !ok {
+				return nil, createTypeError(name, "int", env["b"])
+			}
+			return bf(a, b), nil
 		},
 	}
 }
@@ -27,197 +48,317 @@ var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 var defaultEnv = map[string]interface{}{
 	// return random integer in [0, n)
 	"random": proc{
-		[]string{"i"},
-		func(env map[string]interface{}) interface{} {
-			return rng.Intn(env["i"].(int))
+		[]string{"n"},
+		func(env map[string]interface{}) (interface{}, error) {
+			if n, ok := env["n"].(int); ok {
+				return rng.Intn(n), nil
+			} else {
+				return nil, createTypeError("random", "int", env["n"])
+			}
 		},
 	},
 
 	"cons": proc{
 		[]string{"a", "b"},
-		func(env map[string]interface{}) interface{} {
-			return [2]interface{}{env["a"], env["b"]}
+		func(env map[string]interface{}) (interface{}, error) {
+			return [2]interface{}{env["a"], env["b"]}, nil
 		},
 	},
 
 	"car": proc{
 		[]string{"a"},
-		func(env map[string]interface{}) interface{} {
-			return env["a"].([2]interface{})[0]
+		func(env map[string]interface{}) (interface{}, error) {
+			if a, ok := env["a"].([2]interface{}); ok {
+				return a[0], nil
+			} else {
+				return nil, createTypeError("car", "[2]interface{}", env["a"])
+			}
 		},
 	},
 
 	"cdr": proc{
 		[]string{"a"},
-		func(env map[string]interface{}) interface{} {
-			return env["a"].([2]interface{})[1]
+		func(env map[string]interface{}) (interface{}, error) {
+			if a, ok := env["a"].([2]interface{}); ok {
+				return a[1], nil
+			} else {
+				return nil, createTypeError("cdr", "[2]interface{}", env["a"])
+			}
 		},
 	},
 
 	"null?": proc{
 		[]string{"a"},
-		func(env map[string]interface{}) interface{} {
-			a := env["a"].([2]interface{})
-			return (a[0] == nil) && (a[1] == nil)
+		func(env map[string]interface{}) (interface{}, error) {
+			if a, ok := env["a"].([2]interface{}); ok {
+				return a == [2]interface{}{nil, nil}, nil
+			} else {
+				return nil, createTypeError("null?", "[2]interface{}", env["a"])
+			}
 		},
 	},
 
 	"list": variadicProc{
 		"elements",
-		func(env map[string]interface{}) interface{} {
+		func(env map[string]interface{}) (interface{}, error) {
 			elements := env["elements"].([]interface{})
 			result := [2]interface{}{nil, nil}
 			for i := len(elements) - 1; i >= 0; i-- {
 				result = [2]interface{}{elements[i], result}
 			}
-			return result
+			return result, nil
 		},
 	},
 
 	"+": variadicProc{
 		"nums",
-		func(env map[string]interface{}) interface{} {
+		func(env map[string]interface{}) (interface{}, error) {
 			result := 0
 			nums := env["nums"].([]interface{})
-			for _, num := range nums {
-				result += num.(int)
+			for _, inum := range nums {
+				if num, ok := inum.(int); ok {
+					result += num
+				} else {
+					return nil, createTypeError("+", "int", inum)
+				}
 			}
-			return result
+			return result, nil
 		},
 	},
 
 	"*": variadicProc{
 		"nums",
-		func(env map[string]interface{}) interface{} {
+		func(env map[string]interface{}) (interface{}, error) {
 			result := 1
 			nums := env["nums"].([]interface{})
-			for _, num := range nums {
-				result *= num.(int)
+			for _, inum := range nums {
+				if num, ok := inum.(int); ok {
+					result *= num
+				} else {
+					return nil, createTypeError("*", "int", inum)
+				}
 			}
-			return result
+			return result, nil
 		},
 	},
 
 	"not": proc{
 		[]string{"a"},
-		func(env map[string]interface{}) interface{} {
-			a := env["a"].(bool)
-			return !a
+		func(env map[string]interface{}) (interface{}, error) {
+			if a, ok := env["a"].(bool); ok {
+				return !a, nil
+			} else {
+				return nil, createTypeError("not", "bool", env["a"])
+			}
 		},
 	},
 
 	"and": proc{
 		[]string{"a", "b"},
-		func(env map[string]interface{}) interface{} {
-			a := env["a"].(bool)
-			b := env["b"].(bool)
-			return a && b
+		func(env map[string]interface{}) (interface{}, error) {
+			a, ok := env["a"].(bool)
+			if !ok {
+				return nil, createTypeError("and", "bool", env["a"])
+			}
+			b, ok := env["b"].(bool)
+			if !ok {
+				return nil, createTypeError("and", "bool", env["b"])
+			}
+			return a && b, nil
 		},
 	},
 
 	"or": proc{
 		[]string{"a", "b"},
-		func(env map[string]interface{}) interface{} {
-			a := env["a"].(bool)
-			b := env["b"].(bool)
-			return a || b
+		func(env map[string]interface{}) (interface{}, error) {
+			a, ok := env["a"].(bool)
+			if !ok {
+				return nil, createTypeError("or", "bool", env["a"])
+			}
+			b, ok := env["b"].(bool)
+			if !ok {
+				return nil, createTypeError("or", "bool", env["b"])
+			}
+			return a || b, nil
 		},
 	},
 
-	"-":         createIntBinaryproc(func(a, b int) interface{} { return a - b }),
-	"/":         createIntBinaryproc(func(a, b int) interface{} { return a / b }),
-	">":         createIntBinaryproc(func(a, b int) interface{} { return a > b }),
-	">=":        createIntBinaryproc(func(a, b int) interface{} { return a >= b }),
-	"<":         createIntBinaryproc(func(a, b int) interface{} { return a < b }),
-	"<=":        createIntBinaryproc(func(a, b int) interface{} { return a <= b }),
-	"=":         createIntBinaryproc(func(a, b int) interface{} { return a == b }),
-	"remainder": createIntBinaryproc(func(a, b int) interface{} { return a % b }),
+	"-":         createIntBinaryProc("-", func(a, b int) interface{} { return a - b }),
+	"/":         createIntBinaryProc("/", func(a, b int) interface{} { return a / b }),
+	">":         createIntBinaryProc(">", func(a, b int) interface{} { return a > b }),
+	">=":        createIntBinaryProc(">=", func(a, b int) interface{} { return a >= b }),
+	"<":         createIntBinaryProc("<", func(a, b int) interface{} { return a < b }),
+	"<=":        createIntBinaryProc("<=", func(a, b int) interface{} { return a <= b }),
+	"=":         createIntBinaryProc("=", func(a, b int) interface{} { return a == b }),
+	"remainder": createIntBinaryProc("remainder", func(a, b int) interface{} { return a % b }),
 
 	// modifies given env
-	"define": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+	"define": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
 		name := args[0].(string)
 		value := args[1]
-		env[name] = Eval(value, env)
-		return nil
+		val, err := Eval(value, env)
+		if err != nil {
+			return nil, err
+		}
+		env[name] = val
+		return nil, nil
 	}),
 
-	"lambda": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
-		if _, ok := args[0].([]interface{}); ok {
-			// normal args
-			params := args[0].([]interface{})
+	"lambda": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			return nil, createArgLenError("lambda", 2, args)
+		}
+
+		if params, ok := args[0].([]interface{}); ok {
 			stringParams := make([]string, len(params))
 			for i := range params {
-				stringParams[i] = params[i].(string)
+				if param, ok := params[i].(string); ok {
+					stringParams[i] = param
+				} else {
+					return nil, fmt.Errorf("Eval: procedure 'lambda' expected string parameter names, got %T", params[i])
+				}
 			}
-			body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
 			return proc{
 				stringParams,
-				body,
-			}
-		} else {
-			// variadic args
-			param := args[0].(string)
-			body := func(env map[string]interface{}) interface{} { return Eval(args[1], env) }
+				func(env map[string]interface{}) (interface{}, error) {
+					return Eval(args[1], env)
+				},
+			}, nil
+		} else if param, ok := args[0].(string); ok { // variadic args
 			return variadicProc{
 				param,
-				body,
-			}
+				func(env map[string]interface{}) (interface{}, error) {
+					return Eval(args[1], env)
+				},
+			}, nil
+		} else {
+			return nil, fmt.Errorf("Eval: procedure 'lambda' expected list or string for first argument, got %T", args[0])
 		}
 	}),
 
-	"if": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+	"if": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
+		if len(args) != 3 {
+			return nil, createArgLenError("if", 3, args)
+		}
+
 		condition := args[0]
 		conseq := args[1]
 		alt := args[2]
-		if Eval(condition, env).(bool) {
+		conditionVal, err := Eval(condition, env)
+		if err != nil {
+			return nil, err
+		}
+		conditionBool, ok := conditionVal.(bool)
+		if !ok {
+			return nil, fmt.Errorf("Eval: procedure 'if' expected bool for condition, got %T", conditionVal)
+		}
+		if conditionBool {
 			return Eval(conseq, env)
 		} else {
 			return Eval(alt, env)
 		}
 	}),
 
-	"cond": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+	"cond": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
+		if len(args) == 0 {
+			return nil, fmt.Errorf("Eval: procedure 'cond' expected at least 1 argument, got 0")
+		}
+
 		// check n - 1 branches
 		for _, arg := range args[:len(args)-1] {
-			branch := arg.([]interface{})
+			branch, ok := arg.([]interface{})
+			if !ok {
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected list for argument, got %T", arg)
+			}
+
+			if len(branch) != 2 {
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected 2 items in a branch, got %d", len(branch))
+			}
 			condition := branch[0]
 			body := branch[1]
-			if Eval(condition, env).(bool) {
+
+			conditionVal, err := Eval(condition, env)
+			if err != nil {
+				return nil, err
+			}
+			conditionBool, ok := conditionVal.(bool)
+			if !ok {
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected bool for condition, got %T", conditionVal)
+			}
+			if conditionBool {
 				return Eval(body, env)
 			}
 		}
 
 		// check last branch for 'else'
-		branch := args[len(args)-1].([]interface{})
+		branch, ok := args[len(args)-1].([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Eval: procedure 'cond' expected list for argument, got %T", args[len(args)-1])
+		}
+		if len(branch) != 2 {
+			return nil, fmt.Errorf("Eval: procedure 'cond' expected 2 items in a branch, got %d", len(branch))
+		}
 		condition := branch[0]
 		body := branch[1]
 		if scond, ok := condition.(string); ok && (scond == "else") {
 			return Eval(body, env)
 		} else {
-			if Eval(condition, env).(bool) {
+			conditionVal, err := Eval(condition, env)
+			if err != nil {
+				return nil, err
+			}
+			conditionBool, ok := conditionVal.(bool)
+			if !ok {
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected bool for condition, got %T", conditionVal)
+			}
+			if conditionBool {
 				return Eval(body, env)
 			}
 		}
-		panic("Eval: no branch matched in 'cond' expression")
+		return nil, fmt.Errorf("Eval: no branch matched in 'cond' procedure")
 	}),
 
-	"begin": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+	"begin": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
 		beginEnv := copyEnv(env)
 		var retval interface{} = nil
 		for _, arg := range args {
-			retval = Eval(arg, beginEnv)
+			var err error
+			retval, err = Eval(arg, beginEnv)
+			if err != nil {
+				return nil, err
+			}
 		}
-		return retval
+		return retval, nil
 	}),
 
-	"let": specialForm(func(args []interface{}, env map[string]interface{}) interface{} {
+	"let": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			return nil, createArgLenError("let", 2, args)
+		}
+
 		letEnv := copyEnv(env)
-		defs := args[0].([]interface{})
+		defs, ok := args[0].([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("Eval: procedure 'let' expected type []interface{} for arg 1, got %T", args[0])
+		}
 		for _, def := range defs {
-			pair := def.([]interface{})
-			name := pair[0].(string)
+			pair, ok := def.([]interface{})
+			if !ok {
+				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition of type list, but got %T", def)
+			}
+			if len(pair) != 2 {
+				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition list of length 2, but got %d", len(pair))
+			}
+			name, ok := pair[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition name of type string, but got %T", pair[0])
+			}
 			value := pair[1]
-			letEnv[name] = Eval(value, env)
+			v, err := Eval(value, env)
+			if err != nil {
+				return nil, err
+			}
+			letEnv[name] = v
 		}
 		return Eval(args[1], letEnv)
 	}),
