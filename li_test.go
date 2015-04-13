@@ -49,7 +49,7 @@ func TestLex(t *testing.T) {
   (- thirty-three EULERS_NUMBER))
 (= 1 2)`
 		_, err := Lex(src)
-		if err == nil {
+		if err != ErrUnrecognizedToken {
 			t.Fatal("Lex failed: did not receive expected error")
 		}
 	}
@@ -123,7 +123,7 @@ func TestParse(t *testing.T) {
 			"(", "=", "1", "2", ")",
 		}
 		_, err := Parse(tokens)
-		if err == nil {
+		if err != ErrIncompleteExpression {
 			t.Fatalf("Parse failed: did not receive expected error")
 		}
 	}
@@ -136,7 +136,7 @@ func TestParse(t *testing.T) {
 			"(", "=", "1", "2", ")",
 		}
 		_, err := Parse(tokens)
-		if err == nil {
+		if err != ErrOvercompleteExpression {
 			t.Fatalf("Parse failed: did not receive expected error")
 		}
 	}

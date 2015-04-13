@@ -1,10 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
+)
+
+var (
+	ErrUnrecognizedToken      = errors.New("unrecognized token")
+	ErrIncompleteExpression   = errors.New("incomplete expression")
+	ErrOvercompleteExpression = errors.New("overcomplete expression")
 )
 
 func Lex(src string) ([]string, error) {
@@ -44,7 +51,7 @@ func Lex(src string) ([]string, error) {
 
 		// error if no regex can match current input
 		if !reMatched {
-			return nil, fmt.Errorf("Lex: unrecognized token: %q", src[i:])
+			return nil, ErrUnrecognizedToken
 		}
 	}
 
@@ -75,7 +82,7 @@ func Parse(tokens []string) ([]interface{}, error) {
 		} else if token == ")" {
 			childExpr := stk.Pop().(Stack)
 			if stk.Len() == 0 {
-				return nil, fmt.Errorf("Parse: overcomplete expression")
+				return nil, ErrOvercompleteExpression
 			}
 			parentExpr := stk.Pop().(Stack)
 			parentExpr.Push(childExpr)
@@ -87,7 +94,7 @@ func Parse(tokens []string) ([]interface{}, error) {
 		}
 	}
 	if stk.Len() > 1 {
-		return nil, fmt.Errorf("Parse: incomplete expression")
+		return nil, ErrIncompleteExpression
 	}
 	return stk.Pop().(Stack).ToSlice(), nil
 }
@@ -183,7 +190,7 @@ func Exec(src string) (interface{}, error) {
 	// lex source into tokens
 	tokens, err := Lex(src)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Lex: %v", err)
 	}
 
 	// remove comments and whitespace
@@ -192,7 +199,7 @@ func Exec(src string) (interface{}, error) {
 	// parse into AST
 	exprs, err := Parse(preprocessedTokens)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Parse: %v", err)
 	}
 
 	// evaluate expressions
