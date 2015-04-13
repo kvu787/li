@@ -27,9 +27,13 @@ func main() {
 
 	if len(os.Args) > 1 && os.Args[1] == "-i" {
 		repl()
-		os.Exit(0)
+	} else {
+		readStdin()
 	}
 
+}
+
+func readStdin() {
 	// read from stdin
 	src, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
@@ -65,7 +69,7 @@ func repl() {
 					close(linesc)
 					return
 				} else {
-					fmt.Fprintf(os.Stderr, "Unexpected read err encountered: %v", err)
+					fmt.Fprintf(os.Stderr, "Error when reading from stdin: %v\n", err)
 					os.Exit(1)
 				}
 			}
@@ -76,7 +80,11 @@ func repl() {
 	// lex
 	go func() {
 		for line := range linesc {
-			tokens, _ := Lex(line)
+			tokens, err := Lex(line)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
 			tokens = Preprocess(tokens)
 			for _, token := range tokens {
 				tokensc <- token
@@ -92,7 +100,12 @@ func repl() {
 			currentTokens = append(currentTokens, token)
 			exprs, err := Parse(currentTokens)
 			if err != nil {
-				continue
+				if err == ErrIncompleteExpression {
+					continue
+				} else {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
 			} else {
 				exprsc <- exprs[0]
 				currentTokens = []string{}
@@ -103,7 +116,13 @@ func repl() {
 
 	// eval
 	for expr := range exprsc {
-		v, _ := Eval(expr, env)
+		v, err := Eval(expr, env)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		fmt.Println(">>>", v)
 	}
+
+	os.Exit(0)
 }

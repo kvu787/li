@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	ErrUnrecognizedToken      = errors.New("unrecognized token")
-	ErrIncompleteExpression   = errors.New("incomplete expression")
-	ErrOvercompleteExpression = errors.New("overcomplete expression")
+	ErrUnrecognizedToken      = errors.New("Lex: unrecognized token")
+	ErrIncompleteExpression   = errors.New("Parse: incomplete expression")
+	ErrOvercompleteExpression = errors.New("Parse: overcomplete expression")
 )
 
 func Lex(src string) ([]string, error) {
@@ -190,7 +190,7 @@ func Exec(src string) (interface{}, error) {
 	// lex source into tokens
 	tokens, err := Lex(src)
 	if err != nil {
-		return nil, fmt.Errorf("Lex: %v", err)
+		return nil, err
 	}
 
 	// remove comments and whitespace
@@ -199,7 +199,7 @@ func Exec(src string) (interface{}, error) {
 	// parse into AST
 	exprs, err := Parse(preprocessedTokens)
 	if err != nil {
-		return nil, fmt.Errorf("Parse: %v", err)
+		return nil, err
 	}
 
 	// evaluate expressions
