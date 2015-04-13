@@ -17,7 +17,9 @@ evaluated.
 The value of the final expression is printed to standard output.
 
 The -i flag launches an interactive read-evaluate-print-loop (REPL)
-interpreter.`
+interpreter. Expressions are read from standard input. The result of each
+expression is printed to standard output until EOF is encountered or an
+error occurs.`
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-h" {
