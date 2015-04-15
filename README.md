@@ -4,15 +4,11 @@
 
 ## Installation
 
-```
-go get github.com/kvu787/li
-```
+`go get github.com/kvu787/li`
 
 ## Usage
 
-```
-li [-h | -i]
-```
+`li [-h | -i]`
 
 If no flags are specified, expressions are read from standard input and
 evaluated.
@@ -33,6 +29,7 @@ evaulate. You can evaluate a term of the Fibonacci sequence by piping
 
 ```
 cat examples/fib.scm | li
+233
 ```
 
 ### Running the REPL
