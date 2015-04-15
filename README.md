@@ -10,7 +10,9 @@ go get github.com/kvu787/li
 
 ## Usage
 
-`li [-h | -i]`
+```
+li [-h | -i]
+```
 
 Li evaulates Scheme (Lisp) expressions.
 
@@ -18,7 +20,7 @@ If no flags are specified, expressions are read from standard input and
 evaluated.
 The value of the final expression is printed to standard output.
 
-The -i flag launches an interactive read-evaluate-print-loop (REPL)
+The `-i` flag launches an interactive read-evaluate-print-loop (REPL)
 interpreter. Expressions are read from standard input. The result of each
 expression is printed to standard output until EOF is encountered or an
 error occurs.
