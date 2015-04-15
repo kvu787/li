@@ -4,11 +4,13 @@ Li evaulates Scheme (Lisp) expressions.
 
 ## Installation
 
+```
 go get github.com/kvu787/li
+```
 
 ## Usage
 
-li [-h | -i]
+`li [-h | -i]`
 
 Li evaulates Scheme (Lisp) expressions.
 
@@ -29,7 +31,7 @@ The `examples` directory contains several Scheme programs that `li` can
 evaulate. You can evaluate a term of the Fibonacci sequence by piping
 `fib.scm` into `li`:
 
-```bash
+```
 cat examples/fib.scm | li
 ```
 
@@ -38,7 +40,7 @@ cat examples/fib.scm | li
 `li` runs in interactive mode when given the `-i` option. Below is the
 transcript of a sample session that evaluates Fibonacci terms:
 
-```bash
+```
 $ li -i
 (define fib (lambda (n)
   (cond ((= n 0) 0)
