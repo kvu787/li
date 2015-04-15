@@ -1,6 +1,6 @@
 # li
 
-Li evaulates Scheme (Lisp) expressions.
+`li` evaulates Scheme (Lisp) expressions.
 
 ## Installation
 
@@ -13,8 +13,6 @@ go get github.com/kvu787/li
 ```
 li [-h | -i]
 ```
-
-Li evaulates Scheme (Lisp) expressions.
 
 If no flags are specified, expressions are read from standard input and
 evaluated.
