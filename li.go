@@ -149,7 +149,7 @@ func Eval(expr interface{}, env map[string]interface{}) (interface{}, error) {
 			return vproc.body(procEnv)
 		default:
 			return nil, fmt.Errorf(
-				"Eval: expected special form or procedure but received type %T",
+				"Eval: expected special form or procedure but received type '%T'",
 				function)
 		}
 	case string:
@@ -168,15 +168,15 @@ func Eval(expr interface{}, env map[string]interface{}) (interface{}, error) {
 			// identifier
 			val, ok := env[s]
 			if !ok {
-				return nil, fmt.Errorf("Eval: identifier not found: %s", s)
+				return nil, fmt.Errorf("Eval: identifier not found: '%s'", s)
 			} else {
 				return val, nil
 			}
 		}
 	default:
 		return nil, fmt.Errorf(`Eval: received invalid expression
-	type: %T
-	value: %v`,
+	type: '%T'
+	value: '%v'`,
 			expr, expr)
 	}
 }

@@ -16,13 +16,13 @@ func copyEnv(src map[string]interface{}) map[string]interface{} {
 
 func createTypeError(name string, expectedType string, actual interface{}) error {
 	return fmt.Errorf(
-		"Eval: procedure '%s' expected argument type '%s', but got %T",
+		"Eval: procedure '%s' expected argument type '%s', but got '%T'",
 		name, expectedType, actual)
 }
 
 func createArgLenError(name string, expected int, args []interface{}) error {
 	return fmt.Errorf(
-		"Eval: procedure '%v' expected %v arguments, but got %v arguments",
+		"Eval: procedure '%v' expected %d arguments, but got %d arguments",
 		name, expected, len(args))
 }
 
@@ -215,7 +215,7 @@ var defaultEnv = map[string]interface{}{
 				if param, ok := params[i].(string); ok {
 					stringParams[i] = param
 				} else {
-					return nil, fmt.Errorf("Eval: procedure 'lambda' expected string parameter names, got %T", params[i])
+					return nil, fmt.Errorf("Eval: procedure 'lambda' expected 'string' parameter names, got '%T'", params[i])
 				}
 			}
 			return proc{
@@ -232,7 +232,7 @@ var defaultEnv = map[string]interface{}{
 				},
 			}, nil
 		} else {
-			return nil, fmt.Errorf("Eval: procedure 'lambda' expected list or string for first argument, got %T", args[0])
+			return nil, fmt.Errorf("Eval: procedure 'lambda' expected 'list' or 'string' type for first argument, got '%T'", args[0])
 		}
 	}),
 
@@ -250,7 +250,7 @@ var defaultEnv = map[string]interface{}{
 		}
 		conditionBool, ok := conditionVal.(bool)
 		if !ok {
-			return nil, fmt.Errorf("Eval: procedure 'if' expected bool for condition, got %T", conditionVal)
+			return nil, fmt.Errorf("Eval: procedure 'if' expected 'bool' type for condition, got '%T'", conditionVal)
 		}
 		if conditionBool {
 			return Eval(conseq, env)
@@ -268,7 +268,7 @@ var defaultEnv = map[string]interface{}{
 		for _, arg := range args[:len(args)-1] {
 			branch, ok := arg.([]interface{})
 			if !ok {
-				return nil, fmt.Errorf("Eval: procedure 'cond' expected list for argument, got %T", arg)
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected 'list' type for argument, got '%T'", arg)
 			}
 
 			if len(branch) != 2 {
@@ -283,7 +283,7 @@ var defaultEnv = map[string]interface{}{
 			}
 			conditionBool, ok := conditionVal.(bool)
 			if !ok {
-				return nil, fmt.Errorf("Eval: procedure 'cond' expected bool for condition, got %T", conditionVal)
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected 'bool' type for condition, got '%T'", conditionVal)
 			}
 			if conditionBool {
 				return Eval(body, env)
@@ -293,7 +293,7 @@ var defaultEnv = map[string]interface{}{
 		// check last branch for 'else'
 		branch, ok := args[len(args)-1].([]interface{})
 		if !ok {
-			return nil, fmt.Errorf("Eval: procedure 'cond' expected list for argument, got %T", args[len(args)-1])
+			return nil, fmt.Errorf("Eval: procedure 'cond' expected 'list' type for argument, got '%T'", args[len(args)-1])
 		}
 		if len(branch) != 2 {
 			return nil, fmt.Errorf("Eval: procedure 'cond' expected 2 items in a branch, got %d", len(branch))
@@ -309,7 +309,7 @@ var defaultEnv = map[string]interface{}{
 			}
 			conditionBool, ok := conditionVal.(bool)
 			if !ok {
-				return nil, fmt.Errorf("Eval: procedure 'cond' expected bool for condition, got %T", conditionVal)
+				return nil, fmt.Errorf("Eval: procedure 'cond' expected 'bool' type for condition, got '%T'", conditionVal)
 			}
 			if conditionBool {
 				return Eval(body, env)
@@ -339,19 +339,19 @@ var defaultEnv = map[string]interface{}{
 		letEnv := copyEnv(env)
 		defs, ok := args[0].([]interface{})
 		if !ok {
-			return nil, fmt.Errorf("Eval: procedure 'let' expected type []interface{} for arg 1, got %T", args[0])
+			return nil, fmt.Errorf("Eval: procedure 'let' expected type '[]interface{}' for arg 1, got '%T'", args[0])
 		}
 		for _, def := range defs {
 			pair, ok := def.([]interface{})
 			if !ok {
-				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition of type list, but got %T", def)
+				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition of type 'list', but got '%T'", def)
 			}
 			if len(pair) != 2 {
 				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition list of length 2, but got %d", len(pair))
 			}
 			name, ok := pair[0].(string)
 			if !ok {
-				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition name of type string, but got %T", pair[0])
+				return nil, fmt.Errorf("Eval: procedure 'let' expected a definition name of type 'string', but got '%T'", pair[0])
 			}
 			value := pair[1]
 			v, err := Eval(value, env)
