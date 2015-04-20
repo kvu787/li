@@ -194,6 +194,10 @@ var defaultEnv = map[string]interface{}{
 
 	// modifies given env
 	"define": specialForm(func(args []interface{}, env map[string]interface{}) (interface{}, error) {
+		if len(args) != 2 {
+			return nil, createArgLenError("define", 2, args)
+		}
+
 		name := args[0].(string)
 		value := args[1]
 		val, err := Eval(value, env)
