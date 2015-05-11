@@ -28,7 +28,7 @@ evaulate. You can evaluate a term of the Fibonacci sequence by piping
 `fib.scm` into `li`:
 
 ```
-cat examples/fib.scm | li
+li < examples/fib.scm
 233
 ```
 
